@@ -1,1 +1,42 @@
+name: Build BR Christmas Particles
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths-ignore: [ "README.md" ]
+permissions:
+  contents: read
+jobs:
+  build-windows:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -A x64 -DFFGL_BUILD_EXAMPLE_PLUGINS=OFF -DVCPKG_TARGET_TRIPLET=x64-windows-static -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake"
+      - name: Build Release
+        run: cmake --build build --config Release --parallel
+      - name: Verify FFGL plugin
+        shell: pwsh
+        run: |
+          $dll = "build/plugin/BR Christmas Particles.dll"
+          if (-not (Test-Path $dll)) { throw "Plugin DLL was not produced" }
+          $dumpbin = Get-ChildItem "C:/Program Files/Microsoft Visual Studio/2022/*/VC/Tools/MSVC/*/bin/Hostx64/x64/dumpbin.exe" | Select-Object -Last 1
+          $exports = & $dumpbin.FullName /EXPORTS $dll | Out-String
+          if ($exports -notmatch "plugMain") { throw "Invalid FFGL DLL" }
+          $deps = & $dumpbin.FullName /DEPENDENTS $dll | Out-String
+          if ($deps -match "glew32.dll") { throw "External GLEW dependency found" }
+      - name: Prepare safe nested package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path package,out | Out-Null
+          Copy-Item "build/plugin/BR Christmas Particles.dll" "package/BR Christmas Particles.dll"
+          Copy-Item README.md package/README.txt
+          tar -czf "out/BR-Christmas-Particles-Windows-v0.1.0-beta.tar.gz" -C package .
+      - name: Upload plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: BR-Christmas-Particles-Windows-v0.1.0-beta
+          path: out/BR-Christmas-Particles-Windows-v0.1.0-beta.tar.gz
+          if-no-files-found: error
 

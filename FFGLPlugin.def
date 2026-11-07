@@ -1,0 +1,4 @@
+LIBRARY "BR Christmas Particles"
+EXPORTS
+    plugMain
+
